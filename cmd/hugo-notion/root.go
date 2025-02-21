@@ -56,7 +56,6 @@ func initConfig() {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
-	// Set defaults
 	if viper.GetString("content_dir") == "" {
 		absPath, _ := filepath.Abs("./content")
 		viper.SetDefault("content_dir", absPath)

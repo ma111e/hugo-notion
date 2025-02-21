@@ -55,31 +55,7 @@ func runSync(_ *cobra.Command, _ []string) error {
 			return nil
 		}
 
-		// Create update channel
-		//updates := make(chan sync.SyncResult)
-		//syncer := sync.NewSyncerWithSelection(client, viper.GetString("content_dir"), selectedPages, updates)
-		//
-		//// Run sync UI
-		//p = tea.NewProgram(tui.NewSyncModel())
-		//go func() {
-		//	// Send live updates
-		//	go func() {
-		//		for update := range updates {
-		//			p.Send(update)
-		//		}
-		//	}()
-		//
-		//	results := syncer.Sync(pageID)
-		//	close(updates)
-		//	p.Send(results)
-		//}()
-		//
-		//if _, err := p.Run(); err != nil {
-		//	return fmt.Errorf("error running sync program: %v", err)
-		//}
 	}
-	//else {
-	// Non-isInteractive flow with updates
 	updates := make(chan sync.SyncResult)
 	syncer := sync.NewSyncerWithSelection(client, viper.GetString("content_dir"), selectedPages, updates)
 

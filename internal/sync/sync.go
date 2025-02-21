@@ -99,11 +99,11 @@ func (s *Syncer) syncPage(pageIDString string, destinationDir string) {
 		s.syncChildPage(_block.(*notionapi.ChildPageBlock), hugoPageDir, syncTime, &syncedHugoPageFilePaths)
 	}
 
-	// Clean up old files
-	oldHugoPageFilePaths, _ := lo.Difference(existingHugoPageFilePaths, syncedHugoPageFilePaths)
-
 	// Only delete files in full sync mode
-	if !(len(s.selectedPages) > 0) {
+	if len(s.selectedPages) == 0 {
+		// Clean up old files
+		oldHugoPageFilePaths, _ := lo.Difference(existingHugoPageFilePaths, syncedHugoPageFilePaths)
+
 		s.deleteFiles(oldHugoPageFilePaths)
 	}
 }
@@ -118,19 +118,37 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 		return
 	}
 
-	hugoPageFileName := strings.ReplaceAll(childPageTitle, " ", "-") + ".md"
-	err := os.MkdirAll(hugoPageDir, 0755)
-	if err != nil {
+	// Create sanitized filename/folder name
+	sanitizedName := strings.ReplaceAll(strings.ToLower(childPageTitle), " ", "_")
+
+	// Create the post-specific directory structure
+	postDir := filepath.Join(hugoPageDir, "posts", sanitizedName)
+	imagesDir := filepath.Join(postDir, "images")
+
+	// Create all necessary directories
+	if err := os.MkdirAll(postDir, 0755); err != nil {
 		s.addResult(SyncResult{
 			PageTitle:   childPageTitle,
 			Status:      "Error",
-			Path:        hugoPageDir,
+			Path:        postDir,
 			LastUpdated: time.Now(),
 		})
 		return
 	}
 
-	hugoPageFilePath := filepath.Join(hugoPageDir, hugoPageFileName)
+	if err := os.MkdirAll(imagesDir, 0755); err != nil {
+		s.addResult(SyncResult{
+			PageTitle:   childPageTitle,
+			Status:      "Error",
+			Path:        imagesDir,
+			LastUpdated: time.Now(),
+		})
+		return
+	}
+
+	// Set markdown filename to match directory name
+	hugoPageFileName := sanitizedName + ".md"
+	hugoPageFilePath := filepath.Join(postDir, hugoPageFileName)
 	*syncedHugoPageFilePaths = append(*syncedHugoPageFilePaths, hugoPageFilePath)
 
 	// Convert to markdown
@@ -212,126 +230,6 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 	os.Chtimes(hugoPageFilePath, syncTime, syncTime)
 }
 
-//func (s *Syncer) syncChildDatabase(block notionapi.Block, destinationDir string, syncTime time.Time, syncedHugoPageFilePaths *[]string) {
-//	dbBlock := block.(*notionapi.ChildDatabaseBlock)
-//	dbID := notionapi.DatabaseID(dbBlock.GetID())
-//	dbTitle := dbBlock.ChildDatabase.Title
-//	hugoPageDir := filepath.Join(destinationDir, dbTitle)
-//
-//	existingHugoPageFilePaths, err := filepath.Glob(filepath.Join(hugoPageDir, "*.md"))
-//	if err != nil {
-//		s.addResult(SyncResult{
-//			PageTitle:   dbTitle,
-//			Status:      "Error",
-//			Path:        hugoPageDir,
-//			LastUpdated: time.Now(),
-//		})
-//		return
-//	}
-//
-//	// Query database pages
-//	databaseQueryRequest := notionapi.DatabaseQueryRequest{
-//		PageSize: 100,
-//	}
-//
-//	databaseQueryResponse, err := s.client.Database.Query(context.Background(), dbID, &databaseQueryRequest)
-//	if err != nil {
-//		s.addResult(SyncResult{
-//			PageTitle:   dbTitle,
-//			Status:      "Error",
-//			Path:        hugoPageDir,
-//			LastUpdated: time.Now(),
-//		})
-//		return
-//	}
-//
-//	// Process each database page
-//	for _, page := range databaseQueryResponse.Results {
-//		titleProp := page.Properties["Name"].(*notionapi.TitleProperty)
-//		childPageTitle := titleProp.Title[0].PlainText
-//		childPageLastEditedAt := page.LastEditedTime
-//
-//		hugoPageFileName := strings.ReplaceAll(childPageTitle, " ", "-") + ".md"
-//		err = os.MkdirAll(hugoPageDir, 0755)
-//		if err != nil {
-//			s.addResult(SyncResult{
-//				PageTitle:   childPageTitle,
-//				Status:      "Error",
-//				Path:        hugoPageDir,
-//				LastUpdated: time.Now(),
-//			})
-//			continue
-//		}
-//
-//		hugoPageFilePath := filepath.Join(hugoPageDir, hugoPageFileName)
-//		*syncedHugoPageFilePaths = append(*syncedHugoPageFilePaths, hugoPageFilePath)
-//
-//		if doesFileExist(hugoPageFilePath) && !isFileModTimeRoundedToNearestMinuteLessThanOrEqualTo(hugoPageFilePath, childPageLastEditedAt) {
-//			s.addResult(SyncResult{
-//				PageTitle:   childPageTitle,
-//				Status:      "Skipped",
-//				Path:        hugoPageFilePath,
-//				LastUpdated: childPageLastEditedAt,
-//			})
-//			continue
-//		}
-//
-//		// Create front matter
-//		frontMatter := map[string]string{
-//			"title": childPageTitle,
-//			"date":  page.Properties["date"].(*notionapi.DateProperty).Date.Start.String(),
-//		}
-//
-//		frontMatterYaml, err := yaml.Marshal(frontMatter)
-//		if err != nil {
-//			s.addResult(SyncResult{
-//				PageTitle:   childPageTitle,
-//				Status:      "Error",
-//				Path:        hugoPageFilePath,
-//				LastUpdated: time.Now(),
-//			})
-//			continue
-//		}
-//
-//		// Convert to markdown
-//		markdown, err := notion2markdown.PageToMarkdown(s.client, string(page.ID))
-//		if err != nil {
-//			s.addResult(SyncResult{
-//				PageTitle:   childPageTitle,
-//				Status:      "Error",
-//				Path:        hugoPageFilePath,
-//				LastUpdated: time.Now(),
-//			})
-//			continue
-//		}
-//
-//		// Write the file
-//		pageText := fmt.Sprintf("---\n%s\n---\n\n%s", frontMatterYaml, markdown)
-//		err = os.WriteFile(hugoPageFilePath, []byte(pageText), 0644)
-//		if err != nil {
-//			s.addResult(SyncResult{
-//				PageTitle:   childPageTitle,
-//				Status:      "Error",
-//				Path:        hugoPageFilePath,
-//				LastUpdated: time.Now(),
-//			})
-//			continue
-//		}
-//
-//		os.Chtimes(hugoPageFilePath, syncTime, syncTime)
-//		s.addResult(SyncResult{
-//			PageTitle:   childPageTitle,
-//			Status:      "Updated",
-//			Path:        hugoPageFilePath,
-//			LastUpdated: syncTime,
-//		})
-//	}
-//
-//	// Clean up old files
-//	oldHugoPageFilePaths, _ := lo.Difference(existingHugoPageFilePaths, *syncedHugoPageFilePaths)
-//	s.deleteFiles(oldHugoPageFilePaths)
-//}
-
 func (s *Syncer) addResult(result SyncResult) {
 	s.results = append(s.results, result)
 	if s.updates != nil {
@@ -359,18 +257,3 @@ func (s *Syncer) deleteFiles(filePaths []string) {
 		})
 	}
 }
-
-// Helper functions
-func doesFileExist(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return err == nil
-}
-
-//func isFileModTimeRoundedToNearestMinuteLessThanOrEqualTo(filePath string, _time time.Time) bool {
-//	fileInfo, err := os.Stat(filePath)
-//	if err != nil {
-//		return true // If we can't get file info, assume we should update
-//	}
-//	fileModTimeRoundedToNearestMinute := fileInfo.ModTime().Truncate(time.Minute)
-//	return _time.After(fileModTimeRoundedToNearestMinute)
-//}
