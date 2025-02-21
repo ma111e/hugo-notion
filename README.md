@@ -2,7 +2,12 @@
 This fork attempts to build upon the work of [@nisanthchunduru](https://github.com/nisanthchunduru) to better suit my needs.
 
 ## Additions
-+ 
++ TUI
++ Interactive mode to select which files to sync
++ CLI flags & config file
+
+## Removal
++ Removed the repeat feature as it's bloat for me (use cron or watch to repeat a task at interval)
 
 # hugo-notion
 Author your Hugo blog's blog posts in Notion.
