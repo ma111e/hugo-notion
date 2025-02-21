@@ -68,8 +68,8 @@ func NewSyncModel() syncModel {
 
 	// Define status styles
 	styles := statusStyles{
-		created: lipgloss.NewStyle().Foreground(lipgloss.Color("2")),  // Cyan
-		updated: lipgloss.NewStyle().Foreground(lipgloss.Color("6")),  // Green
+		created: lipgloss.NewStyle().Foreground(lipgloss.Color("2")),  // Green
+		updated: lipgloss.NewStyle().Foreground(lipgloss.Color("6")),  // Cyan
 		skipped: lipgloss.NewStyle().Foreground(lipgloss.Color("3")),  // Yellow
 		error:   lipgloss.NewStyle().Foreground(lipgloss.Color("1")),  // Red
 		deleted: lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // Purple

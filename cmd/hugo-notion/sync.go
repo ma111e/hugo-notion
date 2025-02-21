@@ -15,14 +15,14 @@ import (
 func runSync(_ *cobra.Command, _ []string) error {
 	var selectedPages []string
 
-	notionToken := viper.GetString("token")
+	notionToken := viper.GetString("notion_token")
 	if notionToken == "" {
-		return fmt.Errorf("Notion token not found. Please set NOTION_TOKEN environment variable")
+		return fmt.Errorf("Notion token not provided")
 	}
 
 	contentNotionUrl := viper.GetString("notion_url")
 	if contentNotionUrl == "" {
-		return fmt.Errorf("Notion URL not provided. Use --url flag")
+		return fmt.Errorf("Notion URL not provided")
 	}
 
 	pageID, err := extractPageID(contentNotionUrl)
@@ -32,9 +32,9 @@ func runSync(_ *cobra.Command, _ []string) error {
 
 	client := notionapi.NewClient(notionapi.Token(notionToken))
 
-	interactive := viper.GetBool("interactive")
+	isInteractive := viper.GetBool("interactive")
 
-	if interactive {
+	if isInteractive {
 		// Run selection UI
 		selectionModel := tui.NewSelectionModel(client, pageID)
 		p := tea.NewProgram(selectionModel, tea.WithAltScreen())
@@ -79,7 +79,7 @@ func runSync(_ *cobra.Command, _ []string) error {
 		//}
 	}
 	//else {
-	// Non-interactive flow with updates
+	// Non-isInteractive flow with updates
 	updates := make(chan sync.SyncResult)
 	syncer := sync.NewSyncerWithSelection(client, viper.GetString("content_dir"), selectedPages, updates)
 
