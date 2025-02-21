@@ -1,5 +1,10 @@
-# hugo-notion
+# Fork notice
+This fork attempts to build upon the work of [@nisanthchunduru](https://github.com/nisanthchunduru) to better suit my needs.
 
+## Additions
++ 
+
+# hugo-notion
 Author your Hugo blog's blog posts in Notion.
 
 hugo-notion gives you the ability to use Notion as a CMS (Content Management System) for your Hugo site/blog.
