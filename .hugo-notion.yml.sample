@@ -1,0 +1,4 @@
+content_dir: "./content/"
+notion_url: "https://www.notion.so/changeme_root-page-id"
+front_matter: false
+interactive: false
