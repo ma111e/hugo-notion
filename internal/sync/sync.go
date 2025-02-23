@@ -3,19 +3,27 @@ package sync
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"github.com/ma111e/notion2markdown"
 	"github.com/spf13/viper"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/jomei/notionapi"
-	"github.com/nisanthchunduru/notion2markdown"
 	"github.com/samber/lo"
 	"gopkg.in/yaml.v2"
 )
+
+// Regular expression to find Markdown image tags
+var imageRegex = regexp.MustCompile(`!\[(.*?)\]\((.*?)\)`)
 
 type SyncResult struct {
 	PageTitle   string
@@ -108,24 +116,101 @@ func (s *Syncer) syncPage(pageIDString string, destinationDir string) {
 	}
 }
 
+// downloadImage downloads an image from a URL and saves it to the specified path
+func (s *Syncer) downloadImage(imageURL, destPath string) error {
+	resp, err := http.Get(imageURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	file, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, resp.Body)
+	return err
+}
+
+// generateImageFilename generates a unique filename for an image based on its URL
+func generateImageFilename(imageURL string) string {
+	parsedURL, err := url.Parse(imageURL)
+	if err != nil {
+		// If URL parsing fails, use a hash of the full URL
+		hash := sha256.Sum256([]byte(imageURL))
+		return fmt.Sprintf("%x%s", hash[:8], filepath.Ext(imageURL))
+	}
+
+	// Use the last part of the path as the filename
+	basename := filepath.Base(parsedURL.Path)
+	if basename == "" || basename == "." {
+		// If no filename in URL, use a hash
+		hash := sha256.Sum256([]byte(imageURL))
+		return fmt.Sprintf("%x%s", hash[:8], filepath.Ext(imageURL))
+	}
+
+	return basename
+}
+
+// processImages processes all images in the markdown content
+func (s *Syncer) processImages(markdown string, postDir string, sanitizedName string) string {
+	if viper.GetBool("s3_images") {
+		return markdown // Return unchanged if using S3
+	}
+
+	baseURI := strings.TrimRight(viper.GetString("posts_base_uri"), "/")
+
+	return imageRegex.ReplaceAllStringFunc(markdown, func(match string) string {
+		submatches := imageRegex.FindStringSubmatch(match)
+		if len(submatches) != 3 {
+			return match
+		}
+
+		rawAlt := submatches[1]
+		imageURL := submatches[2]
+
+		chunks := strings.SplitN(rawAlt, "|alt:", 2)
+		caption := chunks[0]
+		alt := chunks[1]
+
+		// Generate filename and paths
+		filename := generateImageFilename(imageURL)
+		imagePath := filepath.Join(postDir, "images", filename)
+		relativeImagePath := fmt.Sprintf("%s/%s/images/%s", baseURI, sanitizedName, filename)
+
+		// Download the image
+		if err := s.downloadImage(imageURL, imagePath); err != nil {
+			// If download fails, return original markdown
+			return match
+		}
+
+		// Return Hugo shortcode
+		return fmt.Sprintf("\n\n{{< figure src=\"%s\" caption=\"%s\" alt=\"%s\" position=\"center\" captionStyle=\"font-style: italic;\" >}}\n\n",
+			relativeImagePath,
+			caption,
+			alt)
+	})
+}
+
 func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir string, syncTime time.Time, syncedHugoPageFilePaths *[]string) {
 	childPageId := block.GetID()
 	childPageTitle := block.ChildPage.Title
 	childPageLastEditedAt := *block.GetLastEditedTime()
 
-	// Skip if not selected (when in selective mode)
 	if len(s.selectedPages) > 0 && !slices.Contains(s.selectedPages, string(childPageId)) {
 		return
 	}
 
-	// Create sanitized filename/folder name
 	sanitizedName := strings.ReplaceAll(strings.ToLower(childPageTitle), " ", "_")
-
-	// Create the post-specific directory structure
-	postDir := filepath.Join(hugoPageDir, "posts", sanitizedName)
+	postDir := filepath.Join(hugoPageDir, sanitizedName)
 	imagesDir := filepath.Join(postDir, "images")
 
-	// Create all necessary directories
 	if err := os.MkdirAll(postDir, 0755); err != nil {
 		s.addResult(SyncResult{
 			PageTitle:   childPageTitle,
@@ -146,12 +231,10 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 		return
 	}
 
-	// Set markdown filename to match directory name
 	hugoPageFileName := sanitizedName + ".md"
 	hugoPageFilePath := filepath.Join(postDir, hugoPageFileName)
 	*syncedHugoPageFilePaths = append(*syncedHugoPageFilePaths, hugoPageFilePath)
 
-	// Convert to markdown
 	markdown, err := notion2markdown.PageToMarkdown(s.client, string(childPageId))
 	if err != nil {
 		s.addResult(SyncResult{
@@ -163,7 +246,9 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 		return
 	}
 
-	// Generate new content
+	// Process images in the markdown content
+	markdown = s.processImages(markdown, postDir, sanitizedName)
+
 	var newContent string
 	if viper.GetBool("front_matter") {
 		hugoPageFrontMatterMap := map[string]string{
@@ -187,7 +272,6 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 		newContent = markdown
 	}
 
-	// Check if file exists and compare content
 	if existingContent, err := os.ReadFile(hugoPageFilePath); err == nil {
 		if bytes.Equal([]byte(newContent), existingContent) {
 			s.addResult(SyncResult{
@@ -198,7 +282,6 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 			})
 			return
 		}
-		// File exists but content is different
 		s.addResult(SyncResult{
 			PageTitle:   childPageTitle,
 			Status:      "Updated",
@@ -206,7 +289,6 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 			LastUpdated: syncTime,
 		})
 	} else {
-		// File doesn't exist - this is a new page
 		s.addResult(SyncResult{
 			PageTitle:   childPageTitle,
 			Status:      "Created",
@@ -215,7 +297,6 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 		})
 	}
 
-	// Write the file
 	err = os.WriteFile(hugoPageFilePath, []byte(newContent), 0644)
 	if err != nil {
 		s.addResult(SyncResult{

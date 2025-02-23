@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	_ "github.com/joho/godotenv/autoload"
-	"path/filepath"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -16,23 +14,29 @@ var (
 	notionToken     string
 	withFrontMatter bool
 	interactive     bool
+	useS3Images     bool
+	postsBaseURI    string
 )
 
 func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./.hugo-notion.yml)")
-	rootCmd.PersistentFlags().StringVarP(&contentDir, "content-dir", "d", "", "content directory (default is ./content)")
+	rootCmd.PersistentFlags().StringVarP(&contentDir, "content-dir", "d", "./content", "content directory (default is ./content)")
 	rootCmd.PersistentFlags().StringVarP(&notionURL, "url", "u", "", "Notion page URL to sync")
 	rootCmd.PersistentFlags().StringVarP(&notionToken, "token", "t", "", "Notion token of the integration connected to the root page to fetch")
 	rootCmd.PersistentFlags().BoolVarP(&withFrontMatter, "front-matter", "f", false, "add front matter in markdown files")
 	rootCmd.PersistentFlags().BoolVarP(&interactive, "interactive", "i", false, "enable interactive page selection")
+	rootCmd.PersistentFlags().BoolVar(&useS3Images, "s3-images", false, "use S3 for image storage (legacy behavior)")
+	rootCmd.PersistentFlags().StringVar(&postsBaseURI, "posts-base-uri", "/", "base URI for posts in the generated site")
 
 	viper.BindPFlag("content_dir", rootCmd.PersistentFlags().Lookup("content-dir"))
 	viper.BindPFlag("notion_token", rootCmd.PersistentFlags().Lookup("token"))
 	viper.BindPFlag("notion_url", rootCmd.PersistentFlags().Lookup("url"))
 	viper.BindPFlag("front_matter", rootCmd.PersistentFlags().Lookup("front-matter"))
 	viper.BindPFlag("interactive", rootCmd.PersistentFlags().Lookup("interactive"))
+	viper.BindPFlag("s3_images", rootCmd.PersistentFlags().Lookup("s3-images"))
+	viper.BindPFlag("posts_base_uri", rootCmd.PersistentFlags().Lookup("posts-base-uri"))
 }
 
 var rootCmd = &cobra.Command{
@@ -55,9 +59,9 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
-
-	if viper.GetString("content_dir") == "" {
-		absPath, _ := filepath.Abs("./content")
-		viper.SetDefault("content_dir", absPath)
-	}
+	//
+	//if viper.GetString("content_dir") == "" {
+	//	absPath, _ := filepath.Abs("./content")
+	//	viper.SetDefault("content_dir", absPath)
+	//}
 }
