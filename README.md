@@ -1,7 +1,8 @@
 # Fork notice
-This fork attempts to build upon the work of [@nisanthchunduru](https://github.com/nisanthchunduru) to better suit my needs.
+This fork builds upon the work of [@nisanthchunduru](https://github.com/nisanthchunduru).
 
 <img src="https://raw.githubusercontent.com/ma111e/hugo-notion/main/readme/preview.png" />
+<img src="https://raw.githubusercontent.com/ma111e/hugo-notion/main/readme/preview_interactive.png" />
 
 ## Additions
 + TUI
@@ -12,93 +13,82 @@ This fork attempts to build upon the work of [@nisanthchunduru](https://github.c
 + Better flexiblility overall
 
 ## Removal
-+ Removed the repeat feature as it's bloat to me (use cron or watch to repeat a task at interval)
++ Removed the repeat feature as it got in the way (check the original project if you need it—or use watch/cron)
++ Docker support (todo: restore it with a proper scheduling method)
 
 # hugo-notion
-Author your Hugo blog's blog posts in Notion.
-
-hugo-notion gives you the ability to use Notion as a CMS (Content Management System) for your Hugo site/blog.
-
-`hugo-notion` is a command line (CLI) tool that syncs your Notion page url to your Hugo site's/blog's `content` directory.
+`hugo-notion` converts Notion pages to markdown in a local directory.
 
 ## Installation
-
-`hugo-notion` is a Go package. To install it, run
-
 ```
-go install github.com/nisanthchunduru/hugo-notion@latest
+go install github.com/ma111e/hugo-notion@latest
 ```
 
-`hugo-notion` is also available as a Docker image if you don't have Go lang installed or if you'd like to run `hugo-notion` in a Docker container. Here's an example `docker-compose.yml` that starts `hugo-notion` in a Docker container
+## Setup
+
+1. Create a Notion integration, generate a secret and connect that integration to the Notion page that will contain the pages to sync.
+    > See https://developers.notion.com/docs/create-a-notion-integration#getting-started
+1. Copy one of the sample configuration file in your Hugo directory and edit it to suit your needs 
+   > `cp .env.sample .env`
+   > 
+   > `cp .hugo-notion.yml.sample .hugo-notion.yml`
+1. Run hugo-notion
+    > `hugo-notion`
+
+### Configuration
+You can either use a `.env` file, environment variables, or the `.hugo-notion.yml` file if you need a more advanced configuration management.
+
+#### YAML defaults
 
 ```yaml
-version: '3.8'
-
-services:
-  hugo:
-    build:
-      context: .
-      dockerfile: Dockerfile.development
-    volumes:
-      - .:/opt/blog/
-    ports:
-      - "1313:1313"
-    command: hugo server --watch --buildDrafts --bind 0.0.0.0 --poll 500ms
-  hugo-notion:
-    image: nisanth074/hugo-notion
-    volumes:
-      - ./content:/opt/blog/content
-    env_file: .env
-    working_dir: /opt/blog
+notion_root_page: https://www.notion.so/xxx-yyy-changeme
+content_dir: ./content/posts
+add_front_matter: false
+interactive: false
+notion_token: ntn_changeme
+posts_base_uri: /posts
+s3_images: false
 ```
+
+#### ENV defaults
+
+```dotenv
+HN_NOTION_ROOT_PAGE=https://www.notion.so/xxx-yyy-changeme
+HN_CONTENT_DIR=./content/posts
+HN_ADD_FRONT_MATTER=false
+HN_INTERACTIVE=false
+HN_NOTION_TOKEN=ntn_changeme
+HN_POSTS_BASE_URI=/posts
+HN_S3_IMAGES=false
+```
+
+Every setting can be overridden with flags at runtime. See [Usage](#Usage) below.
 
 ## Usage
+```yaml
+Usage:
+  hugo-notion [flags]
 
-First, create a Notion integration, generate a secret and connect that integration to the Notion page https://developers.notion.com/docs/create-a-notion-integration#getting-started
-
-Go to your Hugo site directory and run
-
+Flags:
+  -a, --add-front-matter        add front matter in markdown files
+  -c, --config string           config file (default is ./.hugo-notion.yml)
+  -d, --content-dir string      content directory (default is ./content/posts) (default "./content/posts")
+  -h, --help                    help for hugo-notion
+  -i, --interactive             enable interactive page selection
+      --posts-base-uri string   base URI for posts in the generated site (default "/")
+      --s3-images               use S3 for image storage (legacy behavior)
+  -t, --token string            Notion token of the integration connected to the root page to fetch
+  -u, --url string              Notion page URL to sync```
 ```
-NOTION_TOKEN=your_notion_secret hugo-notion your_notion_page_url
-```
-
-`hugo-notion` will sync your Notion page and its children pages to the `content` directory.
-
-`hugo-notion` can also sync your Notion page periodically every 10 seconds. To do so, run
-
-```
-hugo-notion -r
-```
-
-If you'd like to sync at a different frequency (say, 5 seconds), run
-
-```
-hugo-notion -r 5
-```
-
-To avoid the hassle of providing your Notion token and your Notion page url to `huno` every time you run it, create an .env file
-
-```
-echo 'NOTION_TOKEN=your_notion_secret' > .env
-echo 'CONTENT_NOTION_URL=your_notion_page_url >> .env'
-```
-
-### Migration
-
-For an easy migration to Notion, you can use my "blog_content" Notion page as a template [https://www.notion.so/ blog_content-0f1b55769779411a95df1ee9b4b070c9](https://www.notion.so/blog_content-0f1b55769779411a95df1ee9b4b070c9)
-
-I recommend that you move one page from Notion to Hugo first, try hugo-notion to sync that page and once you're happy with hugo-notion, move your other Hugo pages to Notion one by one.
 
 ## Bug reports
 
-If you hit a bug, please do report it by creating a GitHub issue
+If you hit a bug, please do report it by creating a GitHub issue.
 
-## Ruby implementation
-
-`hugo-notion` was originally implemented in Ruby. The Ruby implemetation is deprecated. However, the implementation is still available in the `ruby/` directory for perusalf. 
+PR are welcome.
 
 ## Similar projects
 
-The below are similar projects that didn't meet my needs or thatf I had discovered later
+The below are similar projects that didn't meet my needs or that I had discovered later
 
 - https://github.com/dobassy/notion-hugo-exporter
