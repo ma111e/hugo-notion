@@ -1,0 +1,7 @@
+notion_root_page: https://www.notion.so/xxx-yyy-changeme
+content_dir: ./content/posts
+add_front_matter: false
+interactive: false
+notion_token: ntn_changeme
+posts_base_uri: /posts
+s3_images: false
