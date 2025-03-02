@@ -20,7 +20,7 @@ func runSync(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("Notion token not provided")
 	}
 
-	contentNotionUrl := viper.GetString("notion_url")
+	contentNotionUrl := viper.GetString("notion_root_page")
 	if contentNotionUrl == "" {
 		return fmt.Errorf("Notion URL not provided")
 	}
