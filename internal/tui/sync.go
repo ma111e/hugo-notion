@@ -44,7 +44,7 @@ func NewSyncModel() syncModel {
 
 	columns := []table.Column{
 		{Title: "Page", Width: 30},
-		{Title: "Status", Width: 10},
+		{Title: "Status", Width: 15},
 		{Title: "Path", Width: pathWidth},
 		{Title: "Last Updated", Width: 20},
 	}

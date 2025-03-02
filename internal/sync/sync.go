@@ -64,7 +64,7 @@ func (s *Syncer) Sync(pageID string) []SyncResult {
 	return s.results
 }
 
-func (s *Syncer) syncPage(pageIDString string, destinationDir string) {
+func (s *Syncer) syncPage(pageIDString string, hugoPageDir string) {
 	pageID := notionapi.BlockID(pageIDString)
 	pagination := notionapi.Pagination{
 		PageSize: 100,
@@ -75,17 +75,16 @@ func (s *Syncer) syncPage(pageIDString string, destinationDir string) {
 		s.addResult(SyncResult{
 			PageTitle:   "Root Page",
 			Status:      "Error",
-			Path:        destinationDir,
+			Path:        hugoPageDir,
 			LastUpdated: time.Now(),
 		})
 		return
 	}
 
 	syncTime := time.Now()
-	syncedHugoPageFilePaths := []string{}
-	hugoPageDir := destinationDir
-
-	existingHugoPageFilePaths, err := filepath.Glob(filepath.Join(hugoPageDir, "*.md"))
+	var syncedHugoPageDirs []string
+	var existingHugoPageDirs []string
+	entries, err := os.ReadDir(hugoPageDir)
 	if err != nil {
 		s.addResult(SyncResult{
 			PageTitle:   "File Scan",
@@ -96,6 +95,13 @@ func (s *Syncer) syncPage(pageIDString string, destinationDir string) {
 		return
 	}
 
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirPath := filepath.Join(hugoPageDir, entry.Name())
+			existingHugoPageDirs = append(existingHugoPageDirs, dirPath)
+		}
+	}
+
 	for _, _block := range getChildrenResponse.Results {
 		blockID := string(_block.GetID())
 
@@ -104,15 +110,14 @@ func (s *Syncer) syncPage(pageIDString string, destinationDir string) {
 			continue
 		}
 
-		s.syncChildPage(_block.(*notionapi.ChildPageBlock), hugoPageDir, syncTime, &syncedHugoPageFilePaths)
+		s.syncChildPage(_block.(*notionapi.ChildPageBlock), hugoPageDir, syncTime, &syncedHugoPageDirs)
 	}
 
 	// Only delete files in full sync mode
 	if len(s.selectedPages) == 0 {
-		// Clean up old files
-		oldHugoPageFilePaths, _ := lo.Difference(existingHugoPageFilePaths, syncedHugoPageFilePaths)
-
-		s.deleteFiles(oldHugoPageFilePaths)
+		// Clean up old directories
+		oldHugoPageDirs, _ := lo.Difference(existingHugoPageDirs, syncedHugoPageDirs)
+		s.deleteDirectories(oldHugoPageDirs)
 	}
 }
 
@@ -198,7 +203,7 @@ func (s *Syncer) processImages(markdown string, postDir string, sanitizedName st
 	})
 }
 
-func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir string, syncTime time.Time, syncedHugoPageFilePaths *[]string) {
+func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir string, syncTime time.Time, syncedHugoPageDirs *[]string) {
 	childPageId := block.GetID()
 	childPageTitle := block.ChildPage.Title
 	childPageLastEditedAt := *block.GetLastEditedTime()
@@ -233,7 +238,8 @@ func (s *Syncer) syncChildPage(block *notionapi.ChildPageBlock, hugoPageDir stri
 
 	hugoPageFileName := sanitizedName + ".md"
 	hugoPageFilePath := filepath.Join(postDir, hugoPageFileName)
-	*syncedHugoPageFilePaths = append(*syncedHugoPageFilePaths, hugoPageFilePath)
+	//*syncedHugoPageDirs = append(*syncedHugoPageDirs, hugoPageFilePath)
+	*syncedHugoPageDirs = append(*syncedHugoPageDirs, postDir)
 
 	markdown, err := notion2markdown.PageToMarkdown(s.client, string(childPageId))
 	if err != nil {
@@ -318,22 +324,22 @@ func (s *Syncer) addResult(result SyncResult) {
 	}
 }
 
-func (s *Syncer) deleteFiles(filePaths []string) {
-	for _, filePath := range filePaths {
-		err := os.Remove(filePath)
+func (s *Syncer) deleteDirectories(dirPaths []string) {
+	for _, dirPath := range dirPaths {
+		err := os.RemoveAll(dirPath)
 		if err != nil {
 			s.addResult(SyncResult{
-				PageTitle:   filepath.Base(filePath),
+				PageTitle:   filepath.Base(dirPath),
 				Status:      "Delete Error",
-				Path:        filePath,
+				Path:        dirPath,
 				LastUpdated: time.Now(),
 			})
 			continue
 		}
 		s.addResult(SyncResult{
-			PageTitle:   filepath.Base(filePath),
+			PageTitle:   filepath.Base(dirPath),
 			Status:      "Deleted",
-			Path:        filePath,
+			Path:        dirPath,
 			LastUpdated: time.Now(),
 		})
 	}
