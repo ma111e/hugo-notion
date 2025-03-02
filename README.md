@@ -1,6 +1,8 @@
 # Fork notice
 This fork attempts to build upon the work of [@nisanthchunduru](https://github.com/nisanthchunduru) to better suit my needs.
 
+<img src="https://raw.githubusercontent.com/ma111e/hugo-notion/main/readme/preview.png" />
+
 ## Additions
 + TUI
 + Interactive mode to select which files to sync
