@@ -5,9 +5,12 @@ This fork attempts to build upon the work of [@nisanthchunduru](https://github.c
 + TUI
 + Interactive mode to select which files to sync
 + CLI flags & config file
++ Remote image pull to host them locally
++ Compatible with a more structured post architecture
++ Better flexiblility overall
 
 ## Removal
-+ Removed the repeat feature as it's bloat for me (use cron or watch to repeat a task at interval)
++ Removed the repeat feature as it's bloat to me (use cron or watch to repeat a task at interval)
 
 # hugo-notion
 Author your Hugo blog's blog posts in Notion.
