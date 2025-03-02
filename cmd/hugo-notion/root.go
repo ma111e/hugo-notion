@@ -19,8 +19,6 @@ var (
 )
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./.hugo-notion.yml)")
 	rootCmd.PersistentFlags().StringVarP(&contentDir, "content-dir", "d", "./content", "content directory (default is ./content)")
 	rootCmd.PersistentFlags().StringVarP(&notionURL, "url", "u", "", "Notion page URL to sync")
@@ -44,24 +42,18 @@ var rootCmd = &cobra.Command{
 	Short: "Sync Notion pages to markdown files",
 	Long: `A CLI tool to synchronize Notion pages and databases to markdown files.
 It supports continuous syncing and provides a nice TUI to show sync progress.`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		// godotenv's autoload is used
+		viper.SetEnvPrefix("HN")
+		viper.AutomaticEnv()
+
+		if err := viper.ReadInConfig(); err == nil {
+			fmt.Println("Using config file:", viper.ConfigFileUsed())
+		}
+	},
 	RunE: runSync,
 }
 
 func Execute() error {
 	return rootCmd.Execute()
-}
-
-func initConfig() {
-	// godotenv's autoload is used
-	viper.SetEnvPrefix("HN")
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
-	//
-	//if viper.GetString("content_dir") == "" {
-	//	absPath, _ := filepath.Abs("./content")
-	//	viper.SetDefault("content_dir", absPath)
-	//}
 }
